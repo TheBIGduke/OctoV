@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OctoV</title>
     <style>
+        /* Basic page styling for fullscreen, centered canvas and overlay text */
         body {
             margin: 0;
             overflow: hidden;
@@ -33,9 +34,12 @@
 </head>
 <body>
 
+    <!-- Status message shown at the top of the page -->
     <p id="status">Requesting audio permissions...</p>
 
+    <!-- Import ES module shims for browser import maps support -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <!-- Import map for Three.js and its addons from CDN -->
     <script type="importmap">
         {
             "imports": {
@@ -46,6 +50,7 @@
     </script>
 
     <script type="module">
+        // Import Three.js and required addons
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -59,21 +64,22 @@
         // --- Global Variables ---
         let scene, camera, renderer, composer, controls, sphere, clock, analyser, dataArray;
 
-        // --- NEW: State and Target Variables ---
-        let currentMode = 'TTS';
-        let targetColor = new THREE.Color(0x00ddff).multiplyScalar(1.2);
-        let targetScaleValue = 1.0;
-        let targetSensitivity = 0.20;
-        let targetRotationSpeed = 0.5;
+        // --- State and Target Variables for smooth transitions and mode switching ---
+        let currentMode = 'TTS'; // Current visual mode: 'USER' or 'TTS'
+        let targetColor = new THREE.Color(0x00ddff).multiplyScalar(1.2); // Target color for smooth color transitions
+        let targetScaleValue = 1.0;      // Target scale for sphere
+        let targetSensitivity = 0.20;    // Target sensitivity for audio reactivity
+        let targetRotationSpeed = 0.5;   // Target auto-rotation speed for OrbitControls
         
-        // --- Initialization ---
+        // --- Initialization function: sets up scene, camera, renderer, controls, geometry, shaders, and post-processing ---
         function init() {
-            // --- NEW: Event listener now only sets targets ---
+            // Listen for custom 'sourceChange' events to switch visual modes
             window.addEventListener('sourceChange', (event) => {
                 const source = event.detail.source;
                 currentMode = source; 
                 console.log(`API source changed to: ${source}`);
 
+                // Set target values for smooth transitions depending on mode
                 if (source === 'USER') {
                     targetColor.set(0xebbf34).multiplyScalar(1);
                     targetScaleValue = 0.6;
@@ -87,15 +93,15 @@
                 }
             });
 
-            // Scene setup
+            // Create Three.js scene and clock for animation timing
             scene = new THREE.Scene();
             clock = new THREE.Clock();
 
-            // Camera setup
+            // Set up perspective camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 2.5;
 
-            // Renderer setup
+            // Set up WebGL renderer with tone mapping for better color
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -103,20 +109,22 @@
             renderer.toneMappingExposure = 1.0;
             document.body.appendChild(renderer.domElement);
             
-            // Orbit Controls
+            // Add orbit controls for interactive camera movement
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.5;
 
+            // Create a high-detail icosahedron sphere geometry
             const sphereGeometry = new THREE.IcosahedronGeometry(1, 10);
             
+            // Custom shader material for organic, audio-reactive wireframe sphere
             const sphereMaterial = new THREE.ShaderMaterial({
                 uniforms: {
-                    u_time: { value: 0.0 },
-                    u_frequency: { value: 0.0 },
-                    u_color: { value: new THREE.Color(0x00ddff).multiplyScalar(1.2) },
-                    u_sensitivity: { value: 0.20}
+                    u_time: { value: 0.0 }, // Animation time
+                    u_frequency: { value: 0.0 }, // Audio frequency average
+                    u_color: { value: new THREE.Color(0x00ddff).multiplyScalar(1.2) }, // Sphere color
+                    u_sensitivity: { value: 0.20} // Audio reactivity
                 },
                 vertexShader: `
                     uniform float u_time;
@@ -185,28 +193,32 @@
                         gl_FragColor = vec4(u_color, 1.0);
                     }
                 `,
-                wireframe: true
+                wireframe: true // Show only wireframe for a glowing effect
             });
             sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
             scene.add(sphere);
 
-            // Post-Processing
+            // --- Post-Processing Pipeline ---
             composer = new EffectComposer(renderer);
             const renderPass = new RenderPass(scene, camera);
             composer.addPass(renderPass);
 
+            // Add UnrealBloomPass for glowing effect
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
             bloomPass.threshold = 0.4;
             bloomPass.strength = 0.7;
             bloomPass.radius = 0.5;
             composer.addPass(bloomPass);
             
+            // Output pass for final rendering
             const outputPass = new OutputPass();
             composer.addPass(outputPass);
 
+            // Handle window resizing
             window.addEventListener('resize', onWindowResize, false);
         }
 
+        // --- Adjust camera and renderer on window resize ---
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -214,30 +226,33 @@
             composer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- NEW: animate() function now handles pulsation and transitions ---
+        // --- Animation loop: updates controls, sphere, and renders the scene ---
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
 
+            // Update shader time uniform for animation
             if (sphere && sphere.material.uniforms.u_time) {
                  sphere.material.uniforms.u_time.value = clock.getElapsedTime();
             }
 
+            // If audio analyser is ready, update frequency data and drive visual changes
             if (analyser) {
                 analyser.getByteFrequencyData(dataArray);
                 let sum = dataArray.reduce((a, b) => a + b, 0);
                 const average = sum / dataArray.length || 0;
                 
+                // Smoothly update frequency uniform for organic motion
                 sphere.material.uniforms.u_frequency.value += (average - sphere.material.uniforms.u_frequency.value) * 0.10;
 
-                // Handle pulsation in USER mode
+                // In USER mode, pulsate sphere scale based on audio level
                 if (currentMode === 'USER') {
                     const audioLevel = dataArray[0] / 255; 
                     const pulseAmount = audioLevel * 0.25; 
                     targetScaleValue = 0.6 + pulseAmount; 
                 }
 
-                // Smoothly transition all values
+                // Smoothly interpolate all target values for transitions
                 const lerpFactor = 0.05; 
                 sphere.scale.lerp(new THREE.Vector3(targetScaleValue, targetScaleValue, targetScaleValue), lerpFactor);
                 sphere.material.uniforms.u_color.value.lerp(targetColor, lerpFactor);
@@ -245,15 +260,19 @@
                 sphere.material.uniforms.u_sensitivity.value += (targetSensitivity - sphere.material.uniforms.u_sensitivity.value) * lerpFactor;
             }
 
+            // Render the scene with post-processing
             composer.render();
         }
 
+        // --- Set up Web Audio API analyser for the selected audio device ---
         async function setupAudio(deviceId) {
             try {
+                // Request audio stream from the selected device
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: { deviceId: { exact: deviceId } }
                 });
 
+                // Create audio context and analyser node
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
                 analyser = audioContext.createAnalyser();
@@ -261,37 +280,46 @@
                 analyser.smoothingTimeConstant = 0.8;
                 source.connect(analyser);
 
+                // Prepare array for frequency data
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
                 
+                // Update status message
                 statusEl.textContent = 'Visualization running...';
                 setTimeout(() => { statusEl.style.opacity = '0'; }, 2000);
 
             } catch (err) {
+                // Handle errors (e.g., permission denied, device not found)
                 console.error("Error setting up audio source:", err);
                 statusEl.textContent = `Error: Could not start audio. ${err.message}`;
             }
         }
         
+        // --- Automatically start the visualizer: request permissions, find device, and start audio ---
         async function autoStartVisualizer() {
-            const TARGET_DEVICE_LABEL = 'Monitor of Built-in Audio Analog Stereo'; 
+            const TARGET_DEVICE_LABEL = 'Monitor of Built-in Audio Analog Stereo'; // Change to your system's device label
 
             try {
+                // Request generic audio permission first (required for enumerateDevices to show labels)
                 await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 statusEl.textContent = `Searching for audio device: "${TARGET_DEVICE_LABEL}"...`;
 
+                // List all audio input devices
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const audioInputs = devices.filter(device => device.kind === 'audioinput');
                 
+                // Try to find the device matching the label
                 const targetDevice = audioInputs.find(device => device.label.includes(TARGET_DEVICE_LABEL));
                 
                 if (targetDevice) {
                     statusEl.textContent = 'Device found. Starting visualization...';
                     await setupAudio(targetDevice.deviceId);
                 } else {
+                    // Device not found: show error and print available devices to console
                     console.warn(`Could not find device named "${TARGET_DEVICE_LABEL}". Available devices:`, audioInputs);
                     statusEl.innerHTML = `Error: Could not find audio device: "${TARGET_DEVICE_LABEL}". <br/> Check the console (F12) for a list of available devices.`;
                 }
             } catch (err) {
+                // Handle permission errors and other issues
                 console.error('Error during auto-start:', err);
                 if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                     statusEl.textContent = 'Error: You must grant microphone permission.';
@@ -301,6 +329,7 @@
             }
         }
 
+        // --- Start everything ---
         init();
         animate();
         autoStartVisualizer();
