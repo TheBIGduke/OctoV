@@ -35,7 +35,6 @@
 
     <p id="status">Requesting audio permissions...</p>
 
-    <!-- Importmap for Three.js modules -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
     <script type="importmap">
         {
@@ -59,26 +58,34 @@
         
         // --- Global Variables ---
         let scene, camera, renderer, composer, controls, sphere, clock, analyser, dataArray;
+
+        // --- NEW: State and Target Variables ---
+        let currentMode = 'TTS';
+        let targetColor = new THREE.Color(0x00ddff).multiplyScalar(1.2);
+        let targetScaleValue = 1.0;
+        let targetSensitivity = 0.20;
+        let targetRotationSpeed = 0.5;
         
         // --- Initialization ---
         function init() {
-            //API Logic
-        window.addEventListener('sourceChange', (event) => {
-            const source = event.detail.source;
-            console.log(`API source changed to: ${source}`);
+            // --- NEW: Event listener now only sets targets ---
+            window.addEventListener('sourceChange', (event) => {
+                const source = event.detail.source;
+                currentMode = source; 
+                console.log(`API source changed to: ${source}`);
 
-            if (source === 'USER') {
-                sphere.material.uniforms.u_color.value.set(0xebbf34).multiplyScalar(1); // Orange
-                sphere.material.uniforms.u_sensitivity.value = 0.1;
-                sphere.scale.set(0.8, 0.8, 0.8);
-                controls.autoRotateSpeed = 7.0;
-            } else if (source === 'TTS') {
-                sphere.material.uniforms.u_color.value.set(0x00ddff).multiplyScalar(1.2); // Blue
-                sphere.material.uniforms.u_sensitivity.value = 0.20;
-                sphere.scale.set(1.0, 1.0, 1.0);
-                controls.autoRotateSpeed = 0.5;
-            }
-        });
+                if (source === 'USER') {
+                    targetColor.set(0xebbf34).multiplyScalar(1);
+                    targetScaleValue = 0.6;
+                    targetSensitivity = 0.1;
+                    targetRotationSpeed = 7.0;
+                } else if (source === 'TTS') {
+                    targetColor.set(0x00ddff).multiplyScalar(1.2);
+                    targetScaleValue = 1.0;
+                    targetSensitivity = 0.20;
+                    targetRotationSpeed = 0.5;
+                }
+            });
 
             // Scene setup
             scene = new THREE.Scene();
@@ -165,13 +172,9 @@
                     }
 
                     void main() {
-                        // Divisor is reduced for higher sensitivity
                         float freq = u_frequency / 90.0; 
-                        
                         float noise = snoise(position * (1.0 + freq * 0.8) + u_time * 0.1);
-                        
                         float displacement = noise * freq * u_sensitivity; 
-
                         vec3 newPosition = position + normal * displacement;
                         gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
                     }
@@ -211,6 +214,7 @@
             composer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // --- NEW: animate() function now handles pulsation and transitions ---
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
@@ -221,12 +225,24 @@
 
             if (analyser) {
                 analyser.getByteFrequencyData(dataArray);
-                
                 let sum = dataArray.reduce((a, b) => a + b, 0);
                 const average = sum / dataArray.length || 0;
                 
-                // Smoothing the audio data for a less jittery animation
-                sphere.material.uniforms.u_frequency.value += (average - sphere.material.uniforms.u_frequency.value) * 0.10
+                sphere.material.uniforms.u_frequency.value += (average - sphere.material.uniforms.u_frequency.value) * 0.10;
+
+                // Handle pulsation in USER mode
+                if (currentMode === 'USER') {
+                    const audioLevel = dataArray[0] / 255; 
+                    const pulseAmount = audioLevel * 0.25; 
+                    targetScaleValue = 0.6 + pulseAmount; 
+                }
+
+                // Smoothly transition all values
+                const lerpFactor = 0.05; 
+                sphere.scale.lerp(new THREE.Vector3(targetScaleValue, targetScaleValue, targetScaleValue), lerpFactor);
+                sphere.material.uniforms.u_color.value.lerp(targetColor, lerpFactor);
+                controls.autoRotateSpeed += (targetRotationSpeed - controls.autoRotateSpeed) * lerpFactor;
+                sphere.material.uniforms.u_sensitivity.value += (targetSensitivity - sphere.material.uniforms.u_sensitivity.value) * lerpFactor;
             }
 
             composer.render();
@@ -257,10 +273,9 @@
         }
         
         async function autoStartVisualizer() {
-            const TARGET_DEVICE_LABEL = 'Monitor of Built-in Audio Analog Stereo'; // Change this to your target device name
+            const TARGET_DEVICE_LABEL = 'Monitor of Built-in Audio Analog Stereo'; 
 
             try {
-                // First, request generic permission to unblock device enumeration
                 await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 statusEl.textContent = `Searching for audio device: "${TARGET_DEVICE_LABEL}"...`;
 
@@ -293,4 +308,3 @@
     </script>
 </body>
 </html>
-
