@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OctoV</title>
+    <title>OctoV with WebSocket</title>
     <style>
         /* Basic page styling for fullscreen, centered canvas and overlay text */
         body {
@@ -321,11 +321,49 @@
             }
         }
 
+        // --- WebSocket Connection ---
+        function setupWebSocket() {
+            const socket = new WebSocket('ws://localhost:8080');
+
+            socket.onopen = () => {
+                console.log('WebSocket connection established.');
+                statusEl.textContent = 'Connected to WebSocket server.';
+                setTimeout(() => { statusEl.style.opacity = '0'; }, 2000);
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.source && (message.source === 'USER' || message.source === 'TTS')) {
+                        console.log(`Received command to switch to ${message.source} mode.`);
+                        window.dispatchEvent(new CustomEvent('sourceChange', { detail: { source: message.source } }));
+                    }
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+
+            socket.onclose = () => {
+                console.log('WebSocket connection closed. Attempting to reconnect in 3 seconds...');
+                statusEl.textContent = 'WebSocket connection lost. Reconnecting...';
+                statusEl.style.opacity = '1';
+                setTimeout(setupWebSocket, 3000); // Try to reconnect every 3 seconds
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                statusEl.textContent = 'WebSocket connection error.';
+                statusEl.style.opacity = '1';
+            };
+        }
+
         // --- Start everything ---
         init();
         animate();
         // Initial audio setup for the default TTS mode
         setupAudio('Monitor of Built-in Audio Analog Stereo');
+        // Start WebSocket connection
+        setupWebSocket();
 
     </script>
 </body>
