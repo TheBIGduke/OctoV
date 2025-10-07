@@ -34,12 +34,9 @@
 </head>
 <body>
 
-    <!-- Status message shown at the top of the page -->
     <p id="status">Requesting audio permissions...</p>
 
-    <!-- Import ES module shims for browser import maps support -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
-    <!-- Import map for Three.js and its addons from CDN -->
     <script type="importmap">
         {
             "imports": {
@@ -60,9 +57,10 @@
 
         // --- DOM Elements ---
         const statusEl = document.getElementById('status');
-        
+
         // --- Global Variables ---
         let scene, camera, renderer, composer, controls, sphere, clock, analyser, dataArray;
+        let audioStream, audioContext; // Keep track of audio stream and context
 
         // --- State and Target Variables for smooth transitions and mode switching ---
         let currentMode = 'TTS'; // Current visual mode: 'USER' or 'TTS'
@@ -70,13 +68,13 @@
         let targetScaleValue = 1.0;      // Target scale for sphere
         let targetSensitivity = 0.20;    // Target sensitivity for audio reactivity
         let targetRotationSpeed = 0.5;   // Target auto-rotation speed for OrbitControls
-        
+
         // --- Initialization function: sets up scene, camera, renderer, controls, geometry, shaders, and post-processing ---
         function init() {
             // Listen for custom 'sourceChange' events to switch visual modes
             window.addEventListener('sourceChange', (event) => {
                 const source = event.detail.source;
-                currentMode = source; 
+                currentMode = source;
                 console.log(`API source changed to: ${source}`);
 
                 // Set target values for smooth transitions depending on mode
@@ -85,11 +83,13 @@
                     targetScaleValue = 0.6;
                     targetSensitivity = 0.1;
                     targetRotationSpeed = 7.0;
+                    setupAudio('Built-in Audio Analog Stereo'); // Switch to Microphone
                 } else if (source === 'TTS') {
                     targetColor.set(0x00ddff).multiplyScalar(1.2);
                     targetScaleValue = 1.0;
                     targetSensitivity = 0.20;
                     targetRotationSpeed = 0.5;
+                    setupAudio('Monitor of Built-in Audio Analog Stereo'); // Switch to system audio
                 }
             });
 
@@ -108,7 +108,7 @@
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.0;
             document.body.appendChild(renderer.domElement);
-            
+
             // Add orbit controls for interactive camera movement
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
@@ -117,7 +117,7 @@
 
             // Create a high-detail icosahedron sphere geometry
             const sphereGeometry = new THREE.IcosahedronGeometry(1, 10);
-            
+
             // Custom shader material for organic, audio-reactive wireframe sphere
             const sphereMaterial = new THREE.ShaderMaterial({
                 uniforms: {
@@ -180,9 +180,9 @@
                     }
 
                     void main() {
-                        float freq = u_frequency / 90.0; 
+                        float freq = u_frequency / 90.0;
                         float noise = snoise(position * (1.0 + freq * 0.8) + u_time * 0.1);
-                        float displacement = noise * freq * u_sensitivity; 
+                        float displacement = noise * freq * u_sensitivity;
                         vec3 newPosition = position + normal * displacement;
                         gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
                     }
@@ -209,7 +209,7 @@
             bloomPass.strength = 0.7;
             bloomPass.radius = 0.5;
             composer.addPass(bloomPass);
-            
+
             // Output pass for final rendering
             const outputPass = new OutputPass();
             composer.addPass(outputPass);
@@ -241,19 +241,19 @@
                 analyser.getByteFrequencyData(dataArray);
                 let sum = dataArray.reduce((a, b) => a + b, 0);
                 const average = sum / dataArray.length || 0;
-                
+
                 // Smoothly update frequency uniform for organic motion
                 sphere.material.uniforms.u_frequency.value += (average - sphere.material.uniforms.u_frequency.value) * 0.10;
 
                 // In USER mode, pulsate sphere scale based on audio level
                 if (currentMode === 'USER') {
-                    const audioLevel = dataArray[0] / 255; 
-                    const pulseAmount = audioLevel * 0.25; 
-                    targetScaleValue = 0.6 + pulseAmount; 
+                    const audioLevel = dataArray[0] / 255;
+                    const pulseAmount = audioLevel * 0.25;
+                    targetScaleValue = 0.6 + pulseAmount;
                 }
 
                 // Smoothly interpolate all target values for transitions
-                const lerpFactor = 0.05; 
+                const lerpFactor = 0.05;
                 sphere.scale.lerp(new THREE.Vector3(targetScaleValue, targetScaleValue, targetScaleValue), lerpFactor);
                 sphere.material.uniforms.u_color.value.lerp(targetColor, lerpFactor);
                 controls.autoRotateSpeed += (targetRotationSpeed - controls.autoRotateSpeed) * lerpFactor;
@@ -265,66 +265,58 @@
         }
 
         // --- Set up Web Audio API analyser for the selected audio device ---
-        async function setupAudio(deviceId) {
+        async function setupAudio(deviceLabel) {
             try {
-                // Request audio stream from the selected device
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: { deviceId: { exact: deviceId } }
+                // Stop any existing audio stream to switch devices
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                }
+                if (audioContext) {
+                    audioContext.close();
+                }
+
+                statusEl.textContent = `Searching for audio device: "${deviceLabel}"...`;
+                statusEl.style.opacity = '1';
+
+                // Request permission and enumerate devices
+                await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+                const targetDevice = audioInputs.find(device => device.label.includes(deviceLabel));
+
+                if (!targetDevice) {
+                    console.warn(`Could not find device with label containing "${deviceLabel}". Available devices:`, audioInputs);
+                    statusEl.innerHTML = `Error: Could not find audio device: "${deviceLabel}". <br/> Check the console (F12) for a list of available devices.`;
+                    return;
+                }
+
+                statusEl.textContent = 'Device found. Starting visualization...';
+
+                // Get stream from the target device
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { deviceId: { exact: targetDevice.deviceId } }
                 });
 
-                // Create audio context and analyser node
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioContext.createMediaStreamSource(stream);
+                // Create new audio context and analyser
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(audioStream);
                 analyser = audioContext.createAnalyser();
                 analyser.fftSize = 64;
                 analyser.smoothingTimeConstant = 0.8;
                 source.connect(analyser);
 
-                // Prepare array for frequency data
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
-                
-                // Update status message
+
                 statusEl.textContent = 'Visualization running...';
                 setTimeout(() => { statusEl.style.opacity = '0'; }, 2000);
 
             } catch (err) {
-                // Handle errors (e.g., permission denied, device not found)
                 console.error("Error setting up audio source:", err);
-                statusEl.textContent = `Error: Could not start audio. ${err.message}`;
-            }
-        }
-        
-        // --- Automatically start the visualizer: request permissions, find device, and start audio ---
-        async function autoStartVisualizer() {
-            const TARGET_DEVICE_LABEL = 'Monitor of Built-in Audio Analog Stereo'; // Change to your system's device label
-
-            try {
-                // Request generic audio permission first (required for enumerateDevices to show labels)
-                await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                statusEl.textContent = `Searching for audio device: "${TARGET_DEVICE_LABEL}"...`;
-
-                // List all audio input devices
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const audioInputs = devices.filter(device => device.kind === 'audioinput');
-                
-                // Try to find the device matching the label
-                const targetDevice = audioInputs.find(device => device.label.includes(TARGET_DEVICE_LABEL));
-                
-                if (targetDevice) {
-                    statusEl.textContent = 'Device found. Starting visualization...';
-                    await setupAudio(targetDevice.deviceId);
-                } else {
-                    // Device not found: show error and print available devices to console
-                    console.warn(`Could not find device named "${TARGET_DEVICE_LABEL}". Available devices:`, audioInputs);
-                    statusEl.innerHTML = `Error: Could not find audio device: "${TARGET_DEVICE_LABEL}". <br/> Check the console (F12) for a list of available devices.`;
-                }
-            } catch (err) {
-                // Handle permission errors and other issues
-                console.error('Error during auto-start:', err);
                 if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                     statusEl.textContent = 'Error: You must grant microphone permission.';
                 } else {
-                    statusEl.textContent = 'An error occurred while accessing audio devices.';
+                    statusEl.textContent = `Error: Could not start audio. ${err.message}`;
                 }
             }
         }
@@ -332,7 +324,8 @@
         // --- Start everything ---
         init();
         animate();
-        autoStartVisualizer();
+        // Initial audio setup for the default TTS mode
+        setupAudio('Monitor of Built-in Audio Analog Stereo');
 
     </script>
 </body>
