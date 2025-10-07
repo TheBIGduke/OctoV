@@ -62,6 +62,24 @@
         
         // --- Initialization ---
         function init() {
+            //API Logic
+        window.addEventListener('sourceChange', (event) => {
+            const source = event.detail.source;
+            console.log(`API source changed to: ${source}`);
+
+            if (source === 'USER') {
+                sphere.material.uniforms.u_color.value.set(0xebbf34).multiplyScalar(1); // Orange
+                sphere.material.uniforms.u_sensitivity.value = 0.1;
+                sphere.scale.set(0.8, 0.8, 0.8);
+                controls.autoRotateSpeed = 7.0;
+            } else if (source === 'TTS') {
+                sphere.material.uniforms.u_color.value.set(0x00ddff).multiplyScalar(1.2); // Blue
+                sphere.material.uniforms.u_sensitivity.value = 0.20;
+                sphere.scale.set(1.0, 1.0, 1.0);
+                controls.autoRotateSpeed = 0.5;
+            }
+        });
+
             // Scene setup
             scene = new THREE.Scene();
             clock = new THREE.Clock();
@@ -90,11 +108,13 @@
                 uniforms: {
                     u_time: { value: 0.0 },
                     u_frequency: { value: 0.0 },
-                    u_color: { value: new THREE.Color(0x00ddff) }
+                    u_color: { value: new THREE.Color(0x00ddff).multiplyScalar(1.2) },
+                    u_sensitivity: { value: 0.20}
                 },
                 vertexShader: `
                     uniform float u_time;
                     uniform float u_frequency;
+                    uniform float u_sensitivity;
 
                     // 3D Perlin Noise function (credit: Stefan Gustavson)
                     vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -150,7 +170,7 @@
                         
                         float noise = snoise(position * (1.0 + freq * 0.8) + u_time * 0.1);
                         
-                        float displacement = noise * freq * 0.25; 
+                        float displacement = noise * freq * u_sensitivity; 
 
                         vec3 newPosition = position + normal * displacement;
                         gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
@@ -206,7 +226,7 @@
                 const average = sum / dataArray.length || 0;
                 
                 // Smoothing the audio data for a less jittery animation
-                sphere.material.uniforms.u_frequency.value += (average - sphere.material.uniforms.u_frequency.value) * 0.15;
+                sphere.material.uniforms.u_frequency.value += (average - sphere.material.uniforms.u_frequency.value) * 0.10
             }
 
             composer.render();
@@ -237,7 +257,7 @@
         }
         
         async function autoStartVisualizer() {
-            const TARGET_DEVICE_LABEL = 'Microphone Array';
+            const TARGET_DEVICE_LABEL = 'Monitor of Built-in Audio Analog Stereo'; // Change this to your target device name
 
             try {
                 // First, request generic permission to unblock device enumeration
