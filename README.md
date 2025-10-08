@@ -77,37 +77,50 @@ All configuration is done directly within the `<script type="module">` block in 
 
 The most critical setting is the name of the audio device you wish to capture.
 
-- **Find Your Device Name:**  
-  If the target device isn't found, OctoV logs a list of available audio devices to the browser's developer console (F12). Look for the label of the device you want to use.
+#### Finding Your Audio Device Names
 
-- **Update the Target Device:**  
-  Modify the device label in the `setupAudio()` call for each mode:
-    ```javascript
-    // For TTS mode (system audio)
-    setupAudio('Monitor of Built-in Audio Analog Stereo');
-    // For USER mode (microphone)
-    setupAudio('Built-in Audio Analog Stereo');
-    ```
+**Method 1: Browser Console (Easiest)**
 
-### List Audio Devices on Ubuntu
+1. Open `OctoV.html` in your browser
+2. Open Developer Tools (press `F12`)
+3. Go to the **Console** tab
+4. If OctoV cannot find the configured device, it will automatically print a list of all available audio devices with their labels
+5. Copy the exact label of the device you want to use
+
+**Method 2: System Commands (Ubuntu/Linux)**
 
 To find the names of your audio input and output devices on Ubuntu, use:
 
-**List audio output devices (sinks):**
+List audio output devices (sinks):
 ```bash
 pactl list short sinks
 ```
 
-**List audio input devices (sources):**
+List audio input devices (sources):
 ```bash
 pactl list short sources
 ```
 
-This will display a list of available devices. Use the device names or descriptions shown here to match the labels in your OctoV configuration (e.g., `"Monitor of Built-in Audio Analog Stereo"`).
+**Important Note for Ubuntu Users:**  
+System audio outputs that can be captured for visualization are typically labeled as **"Monitor of ..."** (e.g., `"Monitor of Built-in Audio Analog Stereo"`). These monitor devices capture what's being played through your speakers/headphones, making them perfect for visualizing system audio like TTS or music playback.
 
-**Tip:**  
-You can also see all available audio input and output devices directly in your browser's developer console.  
-- In **Firefox**, open the Developer Tools (press `F12`), go to the **Console** tab, and reload the page. OctoV will print a list of detected audio devices and their labels if it cannot find the target device.
+**Method 3: Browser Permissions Dialog**
+
+When you first load OctoV, your browser will request audio permissions. Some browsers show a dropdown list of available devices in this dialog.
+
+#### Update the Target Device
+
+Modify the device label in the `setupAudio()` call for each mode:
+
+```javascript
+// For TTS mode (system audio - use "Monitor of..." device)
+setupAudio('Monitor of Built-in Audio Analog Stereo');
+
+// For USER mode (microphone - use regular input device)
+setupAudio('Built-in Audio Analog Stereo');
+```
+
+**Tip:** Device names must match exactly, including capitalization and spacing.
 
 ---
 
@@ -147,36 +160,32 @@ You must update the values in this transition section (`targetColor`, `targetSca
 
 #### How to Modify
 
-- **Color:**  
-  Change the hex value in `targetColor.set(0xHEXCODE)` to any valid hex color.  
-  Example:  
-  ```javascript
-  targetColor.set(0xff0000); // Red
-  ```
+**Color:**  
+Change the hex value in `targetColor.set(0xHEXCODE)` to any valid hex color.
+```javascript
+targetColor.set(0xff0000); // Red
+```
 
-- **Scale:**  
-  Adjust `targetScaleValue` to make the sphere larger or smaller.  
-  Example:  
-  ```javascript
-  targetScaleValue = 0.8; // Slightly larger
-  ```
+**Scale:**  
+Adjust `targetScaleValue` to make the sphere larger or smaller.
+```javascript
+targetScaleValue = 0.8; // Slightly larger
+```
 
-- **Sensitivity:**  
-  Change `targetSensitivity` to control how strongly the sphere reacts to audio. Higher values = more movement.  
-  Example:  
-  ```javascript
-  targetSensitivity = 0.3; // More reactive
-  ```
+**Sensitivity:**  
+Change `targetSensitivity` to control how strongly the sphere reacts to audio. Higher values = more movement.
+```javascript
+targetSensitivity = 0.3; // More reactive
+```
 
-- **Rotation Speed:**  
-  Set `targetRotationSpeed` to control how fast the scene auto-rotates.  
-  Example:  
-  ```javascript
-  targetRotationSpeed = 2.0; // Faster rotation
-  ```
+**Rotation Speed:**  
+Set `targetRotationSpeed` to control how fast the scene auto-rotates.
+```javascript
+targetRotationSpeed = 2.0; // Faster rotation
+```
 
-- **Audio Device:**  
-  Change the string in `setupAudio('...')` to match your desired input/output device label.
+**Audio Device:**  
+Change the string in `setupAudio('...')` to match your desired input/output device label.
 
 ---
 
@@ -193,9 +202,9 @@ Send a JSON message like `{"source": "USER"}` or `{"source": "TTS"}` to the WebS
    Open the `OctoV.html` file in a web browser, preferably via a local server. The application will immediately request audio permissions and attempt to find the configured audio device.
 
 2. **Interact with the Scene**
-    - Click and Drag: Rotate the camera around the sphere.
-    - Scroll Wheel: Zoom in and out.
-    - Right-Click and Drag: Pan the camera.
+    - **Click and Drag:** Rotate the camera around the sphere.
+    - **Scroll Wheel:** Zoom in and out.
+    - **Right-Click and Drag:** Pan the camera.
 
    The scene will automatically rotate based on the `targetRotationSpeed` of the current mode.
 
@@ -215,7 +224,8 @@ Send a JSON message like `{"source": "USER"}` or `{"source": "TTS"}` to the WebS
 
 ```
 OctoV/
-└── OctoV.html      # Contains all HTML, CSS, and JavaScript code
+├── OctoV.html      # Main application file (contains all HTML, CSS, and JavaScript)
+└── README.md       # This file
 ```
 
 ---
@@ -248,18 +258,29 @@ OctoV/
 - **Check Audio Permissions:** Ensure you have granted the site permission to use your microphone/audio. If you denied it, you may need to reset permissions in your browser's site settings.
 - **Check Audio Output:** Make sure audio is playing through the device specified in the `setupAudio()` call.
 - **Check Console for Errors:** Open the developer console (F12). The application will log errors if the device cannot be found or if there is a problem with the Web Audio API.
+- **Verify Device Name:** Ensure the device name in your code exactly matches the name shown in the browser console (including capitalization and spacing).
 
 #### "Error: Could not find audio device"
 
 This means the string in the `setupAudio()` call does not match any of your system's available audio devices.
 
-**Solution:** Open the developer console. A list of available devices and their labels will be printed. Copy the exact label of the device you want and use it in the code.
+**Solution:**  
+1. Open the developer console (F12)
+2. Reload the page
+3. A list of available devices and their labels will be printed
+4. Copy the exact label of the device you want
+5. Update the device name in the code
+
+**For Ubuntu users:** Remember that system audio capture requires a "Monitor of..." device name.
 
 #### "Error: You must grant microphone permission"
 
 This occurs if you click "Block" when the browser asks for audio permissions.
 
-**Solution:** Go to your browser's settings for this site (often by clicking the lock icon in the URL bar) and change the "Microphone" or "Audio" permission to "Allow". Reload the page.
+**Solution:**  
+1. Go to your browser's settings for this site (often by clicking the lock icon in the URL bar)
+2. Change the "Microphone" or "Audio" permission to "Allow"
+3. Reload the page
 
 #### Poor Performance or Lag
 
@@ -271,6 +292,15 @@ This occurs if you click "Block" when the browser asks for audio permissions.
     // To a lower value:
     const sphereGeometry = new THREE.IcosahedronGeometry(1, 5);
     ```
+
+#### No System Audio Visualization (Ubuntu)
+
+If you're not seeing visualization when system audio plays:
+
+1. Make sure you're using a "Monitor of..." device name
+2. Verify the monitor device exists: `pactl list short sources | grep monitor`
+3. Ensure audio is actually playing through the monitored output
+4. Check the browser console for any error messages
 
 ---
 
