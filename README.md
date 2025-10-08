@@ -4,19 +4,19 @@
 [![Web Audio API](https://img.shields.io/badge/Web%20Audio%20API-Supported-green.svg)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
 [![HTML5](https://img.shields.io/badge/HTML5-Ready-orange.svg)](https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/HTML5)
 
-An immersive, real-time audio visualizer built with **Three.js**. OctoV captures system audio and transforms it into a dynamic, pulsating orb of light and energy. Featuring two distinct visual modes for different audio sources (e.g., user voice vs. TTS), smooth state transitions, and a glowing post-processing pipeline, OctoV provides a captivating visual experience directly in your web browser.
+OctoV is an immersive, real-time audio visualizer built with **Three.js**. It captures system audio and transforms it into a dynamic, pulsating orb of light and energy. Featuring two distinct visual modes for different audio sources (e.g., user voice vs. TTS), smooth state transitions, and a glowing post-processing pipeline, OctoV provides a captivating visual experience directly in your web browser.
 
 ---
 
 ## Features
 
-- **Real-time Audio Visualization** – Renders a dynamic sphere that reacts to live audio frequencies.
-- **System Audio Capture** – Automatically finds and uses a specific system audio output (e.g., "Monitor of Built-in Audio") for a seamless experience.
-- **Dual Visual Modes** – Switches between 'USER' and 'TTS' modes, each with unique colors, sensitivity, and motion characteristics.
-- **GLSL Shader Effects** – Utilizes custom vertex shaders with Perlin noise to create organic, fluid-like distortions on the sphere's surface.
-- **Post-Processing Pipeline** – Implements an UnrealBloomPass for a vibrant, high-quality glow effect.
-- **Interactive 3D Scene** – Uses OrbitControls to allow users to rotate, pan, and zoom around the visualizer.
-- **Smooth Transitions** – Leverages linear interpolation (lerp) for graceful changes between visual states.
+- **Real-time Audio Visualization** – Dynamic sphere reacts to live audio frequencies.
+- **System Audio Capture** – Automatically finds and uses a specific system audio output (e.g., "Monitor of Built-in Audio") for seamless experience.
+- **Dual Visual Modes** – Switch between 'USER' and 'TTS' modes, each with unique colors, sensitivity, and motion.
+- **GLSL Shader Effects** – Custom vertex shaders with Perlin noise for organic, fluid-like distortions.
+- **Post-Processing Pipeline** – UnrealBloomPass for a vibrant, high-quality glow effect.
+- **Interactive 3D Scene** – OrbitControls for rotating, panning, and zooming the visualizer.
+- **Smooth Transitions** – Linear interpolation (lerp) for graceful changes between visual states.
 - **Event-Driven Control** – Responds to custom `sourceChange` events or WebSocket messages to switch modes externally.
 
 ---
@@ -60,11 +60,10 @@ This project is a single HTML file and does not require a complex installation p
     ```
 
 2. **Set up a Local Server (Recommended):**  
-   For the best experience and to avoid potential browser security restrictions, serve the `OctoV.html` file from a local web server. The Live Server extension for VS Code is an excellent option.
+   For the best experience and to avoid browser security restrictions, serve the `OctoV.html` file from a local web server. The Live Server extension for VS Code is an excellent option.
 
-   Alternatively, you can use Python's built-in server:
+   Or use Python's built-in server:
     ```bash
-    # For Python 3.x
     python -m http.server
     ```
 
@@ -79,7 +78,7 @@ All configuration is done directly within the `<script type="module">` block in 
 The most critical setting is the name of the audio device you wish to capture.
 
 - **Find Your Device Name:**  
-  The code logs a list of available audio devices to the browser's developer console (F12) if the target device isn't found. Look for the label of the device you want to use.
+  If the target device isn't found, OctoV logs a list of available audio devices to the browser's developer console (F12). Look for the label of the device you want to use.
 
 - **Update the Target Device:**  
   Modify the device label in the `setupAudio()` call for each mode:
@@ -92,7 +91,7 @@ The most critical setting is the name of the audio device you wish to capture.
 
 ### List Audio Devices on Ubuntu
 
-To find the names of your audio input and output devices on Ubuntu, use the following commands in your terminal:
+To find the names of your audio input and output devices on Ubuntu, use:
 
 **List audio output devices (sinks):**
 ```bash
@@ -106,9 +105,19 @@ pactl list short sources
 
 This will display a list of available devices. Use the device names or descriptions shown here to match the labels in your OctoV configuration (e.g., `"Monitor of Built-in Audio Analog Stereo"`).
 
+**Tip:**  
+You can also see all available audio input and output devices directly in your browser's developer console.  
+- In **Firefox**, open the Developer Tools (press `F12`), go to the **Console** tab, and reload the page. OctoV will print a list of detected audio devices and their labels if it cannot find the target device.
+
+---
+
 ### Visual Mode Configuration
 
 You can customize the appearance and behavior of the 'USER' and 'TTS' modes within the `sourceChange` event listener in `OctoV.html`.
+
+#### Where and What You Can Modify
+
+Open `OctoV.html` and look for this section inside the `<script type="module">` block:
 
 ```javascript
 window.addEventListener('sourceChange', (event) => {
@@ -117,21 +126,59 @@ window.addEventListener('sourceChange', (event) => {
 
     if (source === 'USER') {
         // --- Customize USER mode ---
-        targetColor.set(0x32a873).multiplyScalar(2);
-        targetScaleValue = 0.6;
-        targetSensitivity = 0.15;
-        targetRotationSpeed = 7.0;
-        setupAudio('Built-in Audio Analog Stereo');
+        targetColor.set(0x32a873).multiplyScalar(2); // Color (hex)
+        targetScaleValue = 0.6;                      // Scale (base size)
+        targetSensitivity = 0.15;                    // Sensitivity (audio reactivity)
+        targetRotationSpeed = 7.0;                   // Rotation speed (auto-rotate)
+        setupAudio('Built-in Audio Analog Stereo');  // Audio device label
     } else if (source === 'TTS') {
         // --- Customize TTS mode ---
-        targetColor.set(0x00ddff).multiplyScalar(1.2);
-        targetScaleValue = 1.0;
-        targetSensitivity = 0.20;
-        targetRotationSpeed = 0.5;
-        setupAudio('Monitor of Built-in Audio Analog Stereo');
+        targetColor.set(0x00ddff).multiplyScalar(1.2); // Color (hex)
+        targetScaleValue = 1.0;                        // Scale (base size)
+        targetSensitivity = 0.20;                      // Sensitivity (audio reactivity)
+        targetRotationSpeed = 0.5;                     // Rotation speed (auto-rotate)
+        setupAudio('Monitor of Built-in Audio Analog Stereo'); // Audio device label
     }
 });
 ```
+
+**Important:**  
+You must update the values in this transition section (`targetColor`, `targetScaleValue`, `targetSensitivity`, `targetRotationSpeed`, and `setupAudio(...)`) to customize the look, feel, and audio source for each mode. These values control the color, size, sensitivity, and rotation speed of the visualizer, as well as which audio device is used for each mode.
+
+#### How to Modify
+
+- **Color:**  
+  Change the hex value in `targetColor.set(0xHEXCODE)` to any valid hex color.  
+  Example:  
+  ```javascript
+  targetColor.set(0xff0000); // Red
+  ```
+
+- **Scale:**  
+  Adjust `targetScaleValue` to make the sphere larger or smaller.  
+  Example:  
+  ```javascript
+  targetScaleValue = 0.8; // Slightly larger
+  ```
+
+- **Sensitivity:**  
+  Change `targetSensitivity` to control how strongly the sphere reacts to audio. Higher values = more movement.  
+  Example:  
+  ```javascript
+  targetSensitivity = 0.3; // More reactive
+  ```
+
+- **Rotation Speed:**  
+  Set `targetRotationSpeed` to control how fast the scene auto-rotates.  
+  Example:  
+  ```javascript
+  targetRotationSpeed = 2.0; // Faster rotation
+  ```
+
+- **Audio Device:**  
+  Change the string in `setupAudio('...')` to match your desired input/output device label.
+
+---
 
 ### WebSocket Integration
 
