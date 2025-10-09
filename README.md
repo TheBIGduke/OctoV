@@ -6,6 +6,11 @@
 
 OctoV is an immersive, real-time audio visualizer built with **Three.js**. It captures system audio and transforms it into a dynamic, pulsating orb of light and energy. Featuring two distinct visual modes for different audio sources (e.g., user voice vs. TTS), smooth state transitions, and a glowing post-processing pipeline, OctoV provides a captivating visual experience directly in your web browser.
 
+![OctoV Demo](Files/avatar.gif)
+
+> [!NOTE]
+> The OctoV visualizer avatar is also featured in the project [Local LLM for Robots](https://github.com/JossueE/Local-LLM-for-Robots) by [JossueE](https://github.com/JossueE). Check out their repository to see OctoV integrated with a local language model and user interactions.
+
 ---
 
 ## Features
