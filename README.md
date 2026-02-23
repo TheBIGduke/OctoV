@@ -197,7 +197,8 @@ Change the string in `setupAudio('...')` to match your desired input/output devi
 ### WebSocket Integration
 
 OctoV supports remote mode switching via WebSocket messages.  
-Send a JSON message like `{"source": "USER"}` or `{"source": "TTS"}` to the WebSocket server (default: `ws://localhost:9030`).
+Send a JSON message like `{"type": "mood", "mood": "Pensando"}` (maps to 'USER' mode) or `{"type": "mood", "mood": "Neutral"}` (maps to 'TTS' mode) to the WebSocket server (default: `ws://localhost:8760`).
+You can also use the legacy format: `{"source": "USER"}` or `{"source": "TTS"}`.
 
 ---
 

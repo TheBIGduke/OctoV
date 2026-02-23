@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,9 +18,11 @@
             align-items: center;
             height: 100vh;
         }
+
         canvas {
             display: block;
         }
+
         #status {
             position: absolute;
             top: 20px;
@@ -32,6 +35,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <p id="status">Requesting audio permissions...</p>
@@ -84,6 +88,12 @@
                     targetSensitivity = 0.15;
                     targetRotationSpeed = 7.0;
                     setupAudio('USB Audio Device'); // Switch to Microphone
+                } else if (source === 'THINKING') {
+                    targetColor.set(0x50c878).multiplyScalar(1.5); // Emerald Green
+                    targetScaleValue = 0.5;
+                    targetSensitivity = 0.10;
+                    targetRotationSpeed = 20.0; // Spinning rapidly
+                    setupAudio('Monitor of USB Audio Device Analog Stereo'); // Switch to system audio
                 } else if (source === 'TTS') {
                     targetColor.set(0x00ddff).multiplyScalar(1.2);
                     targetScaleValue = 0.6;
@@ -124,7 +134,7 @@
                     u_time: { value: 0.0 }, // Animation time
                     u_frequency: { value: 0.0 }, // Audio frequency average
                     u_color: { value: new THREE.Color(0x00ddff).multiplyScalar(1.2) }, // Sphere color
-                    u_sensitivity: { value: 0.20} // Audio reactivity
+                    u_sensitivity: { value: 0.20 } // Audio reactivity
                 },
                 vertexShader: `
                     uniform float u_time;
@@ -233,7 +243,7 @@
 
             // Update shader time uniform for animation
             if (sphere && sphere.material.uniforms.u_time) {
-                 sphere.material.uniforms.u_time.value = clock.getElapsedTime();
+                sphere.material.uniforms.u_time.value = clock.getElapsedTime();
             }
 
             // If audio analyser is ready, update frequency data and drive visual changes
@@ -323,7 +333,7 @@
 
         // --- WebSocket Connection ---
         function setupWebSocket() {
-            const socket = new WebSocket('ws://localhost:9030');
+            const socket = new WebSocket('ws://localhost:8760');
 
             socket.onopen = () => {
                 console.log('WebSocket connection established.');
@@ -334,7 +344,17 @@
             socket.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
-                    if (message.source && (message.source === 'USER' || message.source === 'TTS')) {
+
+                    if (message.type === 'mood') {
+                        console.log(`Received command to switch to mood: ${message.mood}`);
+                        if (message.mood === 'Escuchando') {
+                            window.dispatchEvent(new CustomEvent('sourceChange', { detail: { source: 'USER' } }));
+                        } else if (message.mood === 'Pensando') {
+                            window.dispatchEvent(new CustomEvent('sourceChange', { detail: { source: 'THINKING' } }));
+                        } else if (message.mood === 'Neutral') {
+                            window.dispatchEvent(new CustomEvent('sourceChange', { detail: { source: 'TTS' } }));
+                        }
+                    } else if (message.source && (message.source === 'USER' || message.source === 'TTS' || message.source === 'THINKING')) {
                         console.log(`Received command to switch to ${message.source} mode.`);
                         window.dispatchEvent(new CustomEvent('sourceChange', { detail: { source: message.source } }));
                     }
@@ -367,4 +387,5 @@
 
     </script>
 </body>
+
 </html>
